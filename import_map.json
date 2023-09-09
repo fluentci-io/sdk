@@ -1,0 +1,20 @@
+{
+  "imports": {
+    "graphql-request": "https://esm.sh/v128/graphql-request@6.1.0",
+    "graphql-tag": "https://esm.sh/v132/graphql-tag@2.12.6",
+    "@dagger.io/dagger": "https://esm.sh/v132/*@dagger.io/dagger@0.8.4"
+  },
+  "scopes": {
+    "https://esm.sh/v132/": {
+      "@lifeomic/axios-fetch": "https://esm.sh/v132/@lifeomic/axios-fetch@3.0.1",
+      "adm-zip": "https://esm.sh/v132/adm-zip@0.5.10",
+      "env-paths": "https://esm.sh/v132/env-paths@3.0.0",
+      "execa": "https://esm.sh/v132/execa@7.2.0",
+      "graphql-tag": "https://esm.sh/v132/graphql-tag@2.12.6",
+      "graphql": "https://esm.sh/v132/graphql@16.8.0",
+      "node-color-log": "https://esm.sh/v132/node-color-log@10.0.2",
+      "node-fetch": "https://esm.sh/v132/node-fetch@3.3.2",
+      "tar": "https://esm.sh/v132/tar@6.2.0"
+    }
+  }
+}
