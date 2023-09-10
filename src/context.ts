@@ -4,7 +4,7 @@ import { green } from "https://deno.land/std@0.129.0/fmt/colors.ts";
 import { TerminalSpinner } from "https://deno.land/x/spinners@v1.1.2/mod.ts";
 import { SpinnerTypes } from "https://deno.land/x/spinners@v1.1.2/spinner-types.ts";
 
-export async function uploadContext(src = ".", exclude = []) {
+export async function uploadContext(src = ".", exclude: string[] = []) {
   const id = nanoid();
   const context = `/tmp/${id}.tar`;
   let spinner;
