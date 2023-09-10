@@ -21,3 +21,4 @@ export { GraphQLClient } from "graphql-request";
 export type { ConnectOpts } from "@dagger.io/dagger";
 export { connect } from "./src/connect.ts";
 export type { CallbackFct } from "./src/connect.ts";
+export { uploadContext } from "./src/context.ts";

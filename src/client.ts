@@ -32,9 +32,19 @@ class BaseClient {
     this._queryTree = queryTree || [];
     this.clientHost = host || "127.0.0.1:8080";
     this.sessionToken = sessionToken || "";
+
+    const scheme =
+      this.clientHost.startsWith("localhost") ||
+      this.clientHost.split(":")[0].match(/(?:[0-9]{1,3}\.){3}[0-9]{1,3}/)
+        ? "http"
+        : "https";
+
     const url = Deno.env.has("FLUENTCI_SESSION_ID")
-      ? `http://${host}/query?id=${Deno.env.get("FLUENTCI_SESSION_ID")}`
-      : `http://${host}/query`;
+      ? `${scheme}://${this.clientHost}/query?id=${Deno.env.get(
+          "FLUENTCI_SESSION_ID"
+        )}`
+      : `${scheme}://${this.clientHost}/query`;
+
     this.client = new GraphQLClient(url, {
       headers: {
         Authorization: "Basic " + btoa(sessionToken + ":"),
