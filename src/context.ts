@@ -35,6 +35,7 @@ export async function uploadContext(src = ".", exclude: string[] = []) {
     body: form,
     headers: {
       Authorization: "Basic " + btoa(sessionToken + ":"),
+      "X-FluentCI-Session-ID": Deno.env.get("FLUENTCI_SESSION_ID") || "",
     },
   });
 
