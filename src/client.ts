@@ -48,6 +48,7 @@ class BaseClient {
     this.client = new GraphQLClient(url, {
       headers: {
         Authorization: "Basic " + btoa(sessionToken + ":"),
+        "X-FluentCI-Session-ID": Deno.env.get("FLUENTCI_SESSION_ID") || "",
       },
     });
   }
