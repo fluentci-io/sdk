@@ -11,12 +11,12 @@ export async function connect(
   cb: CallbackFct,
   config: ConnectOpts = {}
 ): Promise<void> {
-  if (!Deno.env.has("FLUENTCI_TOKEN") && !Deno.env.has("FLUENTCI_SESSION_ID")) {
+  if (!Deno.env.has("FLUENTCI_TOKEN") || !Deno.env.has("FLUENTCI_SESSION_ID")) {
     return defaultConnect(cb as unknown as DefaultCallbackFct, config);
   }
 
   const client = new Client({
-    host: Deno.env.get("FLUENTCI_HOST") || "127.0.0.1:8486",
+    host: Deno.env.get("FLUENTCI_HOST") || "vm.fluentci.io",
     sessionToken: Deno.env.get("FLUENTCI_TOKEN"),
   });
 
