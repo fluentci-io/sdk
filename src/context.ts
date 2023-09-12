@@ -19,7 +19,7 @@ export async function uploadContext(src = ".", exclude: string[] = []) {
 
   const sessionToken = Deno.env.get("FLUENTCI_TOKEN");
 
-  const host = Deno.env.get("FLUENTCI_HOST") || "localhost:8486";
+  const host = Deno.env.get("FLUENTCI_HOST") || "vm.fluentci.io";
   const scheme =
     host.startsWith("localhost") ||
     host.split(":")[0].match(/(?:[0-9]{1,3}\.){3}[0-9]{1,3}/)
