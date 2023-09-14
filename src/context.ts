@@ -1,4 +1,4 @@
-import tar from "https://cdn.jsdelivr.net/gh/tsirysndr/tar@v0.1.0/mod.ts";
+import tar from "https://cdn.jsdelivr.net/gh/tsirysndr/tar@v0.1.1/mod.ts";
 import { nanoid } from "https://esm.sh/nanoid@4.0.2";
 import { green } from "https://deno.land/std@0.129.0/fmt/colors.ts";
 import { TerminalSpinner } from "https://deno.land/x/spinners@v1.1.2/mod.ts";
