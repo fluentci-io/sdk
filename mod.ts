@@ -15,10 +15,10 @@ export {
   EngineSessionConnectionTimeoutError,
   NotAwaitedRequestError,
   ERROR_CODES,
-} from "@dagger.io/dagger";
-export { gql } from "graphql-tag";
-export { GraphQLClient } from "graphql-request";
-export type { ConnectOpts } from "@dagger.io/dagger";
+  gql,
+  GraphQLClient,
+} from "./deps.ts";
+export type { ConnectOpts } from "./deps.ts";
 export { connect } from "./src/connect.ts";
 export type { CallbackFct } from "./src/connect.ts";
 export { uploadContext } from "./src/context.ts";
