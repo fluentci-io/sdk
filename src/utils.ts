@@ -1,13 +1,15 @@
 // deno-lint-ignore-file no-explicit-any
-import { ClientError, gql, GraphQLClient } from "graphql-request";
-
 import {
+  ClientError,
+  gql,
+  GraphQLClient,
   GraphQLRequestError,
   TooManyNestedObjectsError,
   UnknownDaggerError,
   NotAwaitedRequestError,
   ExecError,
-} from "@dagger.io/dagger";
+} from "../deps.ts";
+
 import { QueryTree } from "./client.ts";
 
 /**

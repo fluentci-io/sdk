@@ -1,4 +1,4 @@
-import { GraphQLClient } from "graphql-request";
+import { GraphQLClient } from "../deps.ts";
 
 import { computeQuery } from "./utils.ts";
 

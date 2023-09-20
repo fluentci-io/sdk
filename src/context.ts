@@ -1,8 +1,4 @@
-import tar from "https://cdn.jsdelivr.net/gh/tsirysndr/tar@v0.1.1/mod.ts";
-import { nanoid } from "https://esm.sh/nanoid@4.0.2";
-import { green } from "https://deno.land/std@0.129.0/fmt/colors.ts";
-import { TerminalSpinner } from "https://deno.land/x/spinners@v1.1.2/mod.ts";
-import { SpinnerTypes } from "https://deno.land/x/spinners@v1.1.2/spinner-types.ts";
+import { tar, nanoid, green, TerminalSpinner, SpinnerTypes } from "../deps.ts";
 
 export async function uploadContext(src = ".", exclude: string[] = []) {
   const id = nanoid();
@@ -10,7 +6,7 @@ export async function uploadContext(src = ".", exclude: string[] = []) {
   let spinner;
 
   spinner = log(`Compressing ${green(src)} to ${green(context)}`);
-  await tar.compress(src, context, { exclude });
+  await tar.default.compress(src, context, { exclude });
   spinner.succeed(`Compressed ${green(src)} to ${green(context)}`);
 
   const form = new FormData();

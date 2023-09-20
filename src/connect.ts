@@ -2,7 +2,7 @@ import {
   CallbackFct as DefaultCallbackFct,
   ConnectOpts,
   connect as defaultConnect,
-} from "@dagger.io/dagger";
+} from "../deps.ts";
 import Client from "./client.ts";
 
 export type CallbackFct = (client: Client) => Promise<void>;
