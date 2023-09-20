@@ -1,4 +1,10 @@
-import { tar, nanoid, green, TerminalSpinner, SpinnerTypes } from "../deps.ts";
+import {
+  nanoid,
+  green,
+  TerminalSpinner,
+  SpinnerTypes,
+  compress,
+} from "../deps.ts";
 
 export async function uploadContext(src = ".", exclude: string[] = []) {
   const id = nanoid();
@@ -6,7 +12,7 @@ export async function uploadContext(src = ".", exclude: string[] = []) {
   let spinner;
 
   spinner = log(`Compressing ${green(src)} to ${green(context)}`);
-  await tar.default.compress(src, context, { exclude });
+  await compress(src, context, { exclude });
   spinner.succeed(`Compressed ${green(src)} to ${green(context)}`);
 
   const form = new FormData();
