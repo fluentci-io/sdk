@@ -17,8 +17,13 @@ export {
   EngineSessionConnectionTimeoutError,
   NotAwaitedRequestError,
   ERROR_CODES,
-} from "https://esm.sh/v132/*@dagger.io/dagger@0.8.4";
-export * as tar from "https://cdn.jsdelivr.net/gh/tsirysndr/tar@v0.1.1/mod.ts";
+} from "https://esm.sh/@dagger.io/dagger@0.8.4";
+
+import * as tar from "https://cdn.jsdelivr.net/gh/tsirysndr/tar@v0.1.1/mod.ts";
+
+const compress = tar.default.compress;
+
+export { compress };
 
 export { nanoid } from "https://esm.sh/nanoid@4.0.2";
 export { green } from "https://deno.land/std@0.129.0/fmt/colors.ts";
@@ -28,4 +33,4 @@ export { SpinnerTypes } from "https://deno.land/x/spinners@v1.1.2/spinner-types.
 export type {
   CallbackFct,
   ConnectOpts,
-} from "https://esm.sh/v132/*@dagger.io/dagger@0.8.4";
+} from "https://esm.sh/@dagger.io/dagger@0.8.4";
