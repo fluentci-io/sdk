@@ -1,4 +1,4 @@
-import Client from "./src/client.ts";
+import { Client } from "./src/client.ts";
 
 export default Client;
 export * from "./src/client.ts";
