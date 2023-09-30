@@ -3,7 +3,7 @@ import {
   ConnectOpts,
   connect as defaultConnect,
 } from "../deps.ts";
-import Client from "./client.ts";
+import { Client } from "./client.ts";
 
 export type CallbackFct = (client: Client) => Promise<void>;
 
