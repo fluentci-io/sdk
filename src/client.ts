@@ -10,6 +10,15 @@ export type QueryTree = {
   args?: Record<string, unknown>;
 };
 
+/**
+ * @hidden
+ */
+export type Metadata = {
+  [key: string]: {
+    is_enum?: boolean;
+  };
+};
+
 interface ClientConfig {
   queryTree?: QueryTree[];
   host?: string;
@@ -86,17 +95,17 @@ export enum CacheSharingMode {
    * Shares the cache volume amongst many build pipelines,
    * but will serialize the writes
    */
-  Locked,
+  Locked = "LOCKED",
 
   /**
    * Keeps a cache volume for a single build pipeline
    */
-  Private,
+  Private = "PRIVATE",
 
   /**
    * Shares the cache volume amongst many build pipelines
    */
-  Shared,
+  Shared = "SHARED",
 }
 export type ContainerBuildOpts = {
   /**
@@ -119,7 +128,11 @@ export type ContainerBuildOpts = {
   /**
    * Secrets to pass to the build.
    *
-   * They will be mounted at /run/secrets/[secret-name].
+   * They will be mounted at /run/secrets/[secret-name] in the build container
+   *
+   * They can be accessed in the Dockerfile using the "secret" mount type
+   * and mount path /run/secrets/[secret-name]
+   * e.g. RUN --mount=type=secret,id=my-secret curl url?token=$(cat /run/secrets/my-secret)"
    */
   secrets?: Secret[];
 };
@@ -134,35 +147,6 @@ export type ContainerEndpointOpts = {
    * Return a URL with the given scheme, eg. http for http://
    */
   scheme?: string;
-};
-
-export type ContainerExecOpts = {
-  /**
-   * Command to run instead of the container's default command (e.g., ["run", "main.go"]).
-   */
-  args?: string[];
-
-  /**
-   * Content to write to the command's standard input before closing (e.g., "Hello world").
-   */
-  stdin?: string;
-
-  /**
-   * Redirect the command's standard output to a file in the container (e.g., "/tmp/stdout").
-   */
-  redirectStdout?: string;
-
-  /**
-   * Redirect the command's standard error to a file in the container (e.g., "/tmp/stderr").
-   */
-  redirectStderr?: string;
-
-  /**
-   * Provide dagger access to the executed command.
-   * Do not use this option unless you trust the command being executed.
-   * The command being executed WILL BE GRANTED FULL ACCESS TO YOUR HOST FILESYSTEM.
-   */
-  experimentalPrivilegedNesting?: boolean;
 };
 
 export type ContainerExportOpts = {
@@ -180,6 +164,13 @@ export type ContainerExportOpts = {
    * engine's cache, then it will be compressed using Gzip.
    */
   forcedCompression?: ImageLayerCompression;
+
+  /**
+   * Use the specified media types for the exported image's layers. Defaults to OCI, which
+   * is largely compatible with most recent container runtimes, but Docker may be needed
+   * for older runtimes without OCI support.
+   */
+  mediaTypes?: ImageMediaTypes;
 };
 
 export type ContainerImportOpts = {
@@ -217,6 +208,13 @@ export type ContainerPublishOpts = {
    * engine's cache, then it will be compressed using Gzip.
    */
   forcedCompression?: ImageLayerCompression;
+
+  /**
+   * Use the specified media types for the published image's layers. Defaults to OCI, which
+   * is largely compatible with most recent registries, but Docker may be needed for older
+   * registries without OCI support.
+   */
+  mediaTypes?: ImageMediaTypes;
 };
 
 export type ContainerWithDefaultArgsOpts = {
@@ -379,6 +377,14 @@ export type ContainerWithMountedSecretOpts = {
    * If the group is omitted, it defaults to the same as the user.
    */
   owner?: string;
+
+  /**
+   * Permission given to the mounted secret (e.g., 0600).
+   * This option requires an owner to be set to be active.
+   *
+   * Default: 0400.
+   */
+  mode?: number;
 };
 
 export type ContainerWithNewFileOpts = {
@@ -431,6 +437,10 @@ export type ContainerID = string & { __ContainerID: never };
  * The `DateTime` scalar type represents a DateTime. The DateTime is serialized as an RFC 3339 quoted string
  */
 export type DateTime = string & { __DateTime: never };
+
+export type DirectoryAsModuleOpts = {
+  sourceSubpath?: string;
+};
 
 export type DirectoryDockerBuildOpts = {
   /**
@@ -526,10 +536,51 @@ export type DirectoryWithNewFileOpts = {
  */
 export type DirectoryID = string & { __DirectoryID: never };
 
+export type FileExportOpts = {
+  /**
+   * If allowParentDirPath is true, the path argument can be a directory path, in which case
+   * the file will be created in that directory.
+   */
+  allowParentDirPath?: boolean;
+};
+
 /**
  * A file identifier.
  */
 export type FileID = string & { __FileID: never };
+
+export type FunctionCallOpts = {
+  input?: FunctionCallInput[];
+};
+
+export type FunctionWithArgOpts = {
+  /**
+   * A doc string for the argument, if any
+   */
+  description?: string;
+
+  /**
+   * A default value to use for this argument if not explicitly set by the caller, if any
+   */
+  defaultValue?: JSON;
+};
+
+export type FunctionCallInput = {
+  /**
+   * The name of the argument to the function
+   */
+  name: string;
+
+  /**
+   * The value of the argument represented as a string of the JSON serialization.
+   */
+  value: JSON;
+};
+
+/**
+ * A reference to a Function.
+ */
+export type FunctionID = string & { __FunctionID: never };
 
 export type GitRefTreeOpts = {
   sshKnownHosts?: string;
@@ -548,32 +599,46 @@ export type HostDirectoryOpts = {
   include?: string[];
 };
 
-export type HostWorkdirOpts = {
-  /**
-   * Exclude artifacts that match the given pattern (e.g., ["node_modules/", ".git*"]).
-   */
-  exclude?: string[];
-
-  /**
-   * Include only artifacts that match the given pattern (e.g., ["app/", "package.*"]).
-   */
-  include?: string[];
-};
-
 /**
  * The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID.
  */
 export type ID = string & { __ID: never };
 
 /**
- * Compression algorithm to use for image layers
+ * Compression algorithm to use for image layers.
  */
 export enum ImageLayerCompression {
-  Estargz,
-  Gzip,
-  Uncompressed,
-  Zstd,
+  Estargz = "EStarGZ",
+  Gzip = "Gzip",
+  Uncompressed = "Uncompressed",
+  Zstd = "Zstd",
 }
+/**
+ * Mediatypes to use in published or exported image metadata.
+ */
+export enum ImageMediaTypes {
+  Dockermediatypes = "DockerMediaTypes",
+  Ocimediatypes = "OCIMediaTypes",
+}
+/**
+ * An arbitrary JSON-encoded value.
+ */
+export type JSON = string & { __JSON: never };
+
+export type ModuleServeOpts = {
+  environment?: ModuleEnvironmentVariable[];
+};
+
+export type ModuleEnvironmentVariable = {
+  name: string;
+  value?: string;
+};
+
+/**
+ * A reference to a Module.
+ */
+export type ModuleID = string & { __ModuleID: never };
+
 /**
  * Transport layer network protocol associated to a port.
  */
@@ -581,12 +646,12 @@ export enum NetworkProtocol {
   /**
    * TCP (Transmission Control Protocol)
    */
-  Tcp,
+  Tcp = "TCP",
 
   /**
    * UDP (User Datagram Protocol)
    */
-  Udp,
+  Udp = "UDP",
 }
 export type PipelineLabel = {
   /**
@@ -606,16 +671,6 @@ export type PipelineLabel = {
  * The format is [os]/[platform]/[version] (e.g., "darwin/arm64/v7", "windows/amd64", "linux/arm64").
  */
 export type Platform = string & { __Platform: never };
-
-/**
- * A unique project command identifier.
- */
-export type ProjectCommandID = string & { __ProjectCommandID: never };
-
-/**
- * A unique project identifier.
- */
-export type ProjectID = string & { __ProjectID: never };
 
 export type ClientContainerOpts = {
   id?: ContainerID;
@@ -645,6 +700,10 @@ export type ClientHttpOpts = {
   experimentalServiceHost?: Container;
 };
 
+export type ClientModuleOpts = {
+  id?: ModuleID;
+};
+
 export type ClientPipelineOpts = {
   /**
    * Pipeline description.
@@ -657,16 +716,12 @@ export type ClientPipelineOpts = {
   labels?: PipelineLabel[];
 };
 
-export type ClientProjectOpts = {
-  id?: ProjectID;
-};
-
-export type ClientProjectCommandOpts = {
-  id?: ProjectCommandID;
-};
-
 export type ClientSocketOpts = {
   id?: SocketID;
+};
+
+export type ClientTypeDefOpts = {
+  id?: TypeDefID;
 };
 
 /**
@@ -679,6 +734,71 @@ export type SecretID = string & { __SecretID: never };
  */
 export type SocketID = string & { __SocketID: never };
 
+export type TypeDefWithFieldOpts = {
+  /**
+   * A doc string for the field, if any
+   */
+  description?: string;
+};
+
+export type TypeDefWithObjectOpts = {
+  description?: string;
+};
+
+/**
+ * A reference to a TypeDef.
+ */
+export type TypeDefID = string & { __TypeDefID: never };
+
+/**
+ * Distinguishes the different kinds of TypeDefs.
+ */
+export enum TypeDefKind {
+  /**
+   * A boolean value
+   */
+  Booleankind = "BooleanKind",
+
+  /**
+   * An integer value
+   */
+  Integerkind = "IntegerKind",
+
+  /**
+   * A list of values all having the same type.
+   *
+   * Always paired with a ListTypeDef.
+   */
+  Listkind = "ListKind",
+
+  /**
+   * A named type defined in the GraphQL schema, with fields and functions.
+   *
+   * Always paired with an ObjectTypeDef.
+   */
+  Objectkind = "ObjectKind",
+
+  /**
+   * A string value
+   */
+  Stringkind = "StringKind",
+
+  /**
+   * A special kind used to signify that no value is returned.
+   *
+   * This is used for functions that have no return value. The outer TypeDef
+   * specifying this Kind is always Optional, as the Void is never actually
+   * represented.
+   */
+  Voidkind = "VoidKind",
+}
+/**
+ * The absense of a value.
+ *
+ * A Null Void is used as a placeholder for resolvers that do not return anything.
+ */
+export type Void = string & { __Void: never };
+
 export type __TypeEnumValuesOpts = {
   includeDeprecated?: boolean;
 };
@@ -690,10 +810,105 @@ export type __TypeFieldsOpts = {
 /**
  * A directory whose contents persist across runs.
  */
-
 export class CacheVolume extends BaseClient {
+  private readonly _id?: CacheID = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _id?: CacheID
+  ) {
+    super(parent);
+
+    this._id = _id;
+  }
   async id(): Promise<CacheID> {
+    if (this._id) {
+      return this._id;
+    }
+
     const response: Awaited<CacheID> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "id",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+}
+
+/**
+ * An OCI-compatible container, also known as a docker container.
+ */
+export class Container extends BaseClient {
+  private readonly _id?: ContainerID = undefined;
+  private readonly _endpoint?: string = undefined;
+  private readonly _envVariable?: string = undefined;
+  private readonly _export?: boolean = undefined;
+  private readonly _hostname?: string = undefined;
+  private readonly _imageRef?: string = undefined;
+  private readonly _label?: string = undefined;
+  private readonly _platform?: Platform = undefined;
+  private readonly _publish?: string = undefined;
+  private readonly _stderr?: string = undefined;
+  private readonly _stdout?: string = undefined;
+  private readonly _sync?: ContainerID = undefined;
+  private readonly _user?: string = undefined;
+  private readonly _workdir?: string = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _id?: ContainerID,
+    _endpoint?: string,
+    _envVariable?: string,
+    _export?: boolean,
+    _hostname?: string,
+    _imageRef?: string,
+    _label?: string,
+    _platform?: Platform,
+    _publish?: string,
+    _stderr?: string,
+    _stdout?: string,
+    _sync?: ContainerID,
+    _user?: string,
+    _workdir?: string
+  ) {
+    super(parent);
+
+    this._id = _id;
+    this._endpoint = _endpoint;
+    this._envVariable = _envVariable;
+    this._export = _export;
+    this._hostname = _hostname;
+    this._imageRef = _imageRef;
+    this._label = _label;
+    this._platform = _platform;
+    this._publish = _publish;
+    this._stderr = _stderr;
+    this._stdout = _stdout;
+    this._sync = _sync;
+    this._user = _user;
+    this._workdir = _workdir;
+  }
+
+  /**
+   * A unique identifier for this container.
+   */
+  async id(): Promise<ContainerID> {
+    if (this._id) {
+      return this._id;
+    }
+
+    const response: Awaited<ContainerID> = await computeQuery(
       [
         ...this._queryTree,
         {
@@ -707,37 +922,6 @@ export class CacheVolume extends BaseClient {
   }
 
   /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
-   *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
-   */
-  with(arg: (param: CacheVolume) => CacheVolume) {
-    return arg(this);
-  }
-}
-
-/**
- * An OCI-compatible container, also known as a docker container.
- */
-
-export class Container extends BaseClient {
-  /**
    * Initializes this container from a Dockerfile build.
    * @param context Directory context used by the Dockerfile.
    * @param opts.dockerfile Path to the Dockerfile to use.
@@ -747,7 +931,11 @@ export class Container extends BaseClient {
    * @param opts.target Target build stage to build.
    * @param opts.secrets Secrets to pass to the build.
    *
-   * They will be mounted at /run/secrets/[secret-name].
+   * They will be mounted at /run/secrets/[secret-name] in the build container
+   *
+   * They can be accessed in the Dockerfile using the "secret" mount type
+   * and mount path /run/secrets/[secret-name]
+   * e.g. RUN --mount=type=secret,id=my-secret curl url?token=$(cat /run/secrets/my-secret)"
    */
   build(context: Directory, opts?: ContainerBuildOpts): Container {
     return new Container({
@@ -812,6 +1000,10 @@ export class Container extends BaseClient {
    * @param opts.scheme Return a URL with the given scheme, eg. http for http://
    */
   async endpoint(opts?: ContainerEndpointOpts): Promise<string> {
+    if (this._endpoint) {
+      return this._endpoint;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -848,6 +1040,10 @@ export class Container extends BaseClient {
    * @param name The name of the environment variable to retrieve (e.g., "PATH").
    */
   async envVariable(name: string): Promise<string> {
+    if (this._envVariable) {
+      return this._envVariable;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -866,61 +1062,36 @@ export class Container extends BaseClient {
    * Retrieves the list of environment variables passed to commands.
    */
   async envVariables(): Promise<EnvVariable[]> {
-    const response: Awaited<EnvVariable[]> = await computeQuery(
+    type envVariables = {
+      name: string;
+      value: string;
+    };
+
+    const response: Awaited<envVariables[]> = await computeQuery(
       [
         ...this._queryTree,
         {
           operation: "envVariables",
         },
-      ],
-      this.client
-    );
-
-    return response;
-  }
-
-  /**
-   * Retrieves this container after executing the specified command inside it.
-   * @param opts.args Command to run instead of the container's default command (e.g., ["run", "main.go"]).
-   * @param opts.stdin Content to write to the command's standard input before closing (e.g., "Hello world").
-   * @param opts.redirectStdout Redirect the command's standard output to a file in the container (e.g., "/tmp/stdout").
-   * @param opts.redirectStderr Redirect the command's standard error to a file in the container (e.g., "/tmp/stderr").
-   * @param opts.experimentalPrivilegedNesting Provide dagger access to the executed command.
-   * Do not use this option unless you trust the command being executed.
-   * The command being executed WILL BE GRANTED FULL ACCESS TO YOUR HOST FILESYSTEM.
-   * @deprecated Replaced by withExec.
-   */
-  exec(opts?: ContainerExecOpts): Container {
-    return new Container({
-      queryTree: [
-        ...this._queryTree,
         {
-          operation: "exec",
-          args: { ...opts },
-        },
-      ],
-      host: this.clientHost,
-      sessionToken: this.sessionToken,
-    });
-  }
-
-  /**
-   * Exit code of the last executed command. Zero means success.
-   *
-   * Will execute default command if none is set, or error if there's no default.
-   */
-  async exitCode(): Promise<number> {
-    const response: Awaited<number> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "exitCode",
+          operation: "name value",
         },
       ],
       this.client
     );
 
-    return response;
+    return response.map(
+      (r) =>
+        new EnvVariable(
+          {
+            queryTree: this.queryTree,
+            host: this.clientHost,
+            sessionToken: this.sessionToken,
+          },
+          r.name,
+          r.value
+        )
+    );
   }
 
   /**
@@ -937,14 +1108,26 @@ export class Container extends BaseClient {
    * cache, that will be used (this can result in a mix of compression algorithms for
    * different layers). If this is unset and a layer has no compressed blob in the
    * engine's cache, then it will be compressed using Gzip.
+   * @param opts.mediaTypes Use the specified media types for the exported image's layers. Defaults to OCI, which
+   * is largely compatible with most recent container runtimes, but Docker may be needed
+   * for older runtimes without OCI support.
    */
   async export(path: string, opts?: ContainerExportOpts): Promise<boolean> {
+    if (this._export) {
+      return this._export;
+    }
+
+    const metadata: Metadata = {
+      forcedCompression: { is_enum: true },
+      mediaTypes: { is_enum: true },
+    };
+
     const response: Awaited<boolean> = await computeQuery(
       [
         ...this._queryTree,
         {
           operation: "export",
-          args: { path, ...opts },
+          args: { path, ...opts, __metadata: metadata },
         },
       ],
       this.client
@@ -956,20 +1139,44 @@ export class Container extends BaseClient {
   /**
    * Retrieves the list of exposed ports.
    *
+   * This includes ports already exposed by the image, even if not
+   * explicitly added with dagger.
+   *
    * Currently experimental; set _EXPERIMENTAL_DAGGER_SERVICES_DNS=0 to disable.
    */
   async exposedPorts(): Promise<Port[]> {
-    const response: Awaited<Port[]> = await computeQuery(
+    type exposedPorts = {
+      description: string;
+      port: number;
+      protocol: NetworkProtocol;
+    };
+
+    const response: Awaited<exposedPorts[]> = await computeQuery(
       [
         ...this._queryTree,
         {
           operation: "exposedPorts",
         },
+        {
+          operation: "description port protocol",
+        },
       ],
       this.client
     );
 
-    return response;
+    return response.map(
+      (r) =>
+        new Port(
+          {
+            queryTree: this.queryTree,
+            host: this.clientHost,
+            sessionToken: this.sessionToken,
+          },
+          r.description,
+          r.port,
+          r.protocol
+        )
+    );
   }
 
   /**
@@ -1013,28 +1220,15 @@ export class Container extends BaseClient {
   }
 
   /**
-   * Retrieves this container's root filesystem. Mounts are not included.
-   * @deprecated Replaced by rootfs.
-   */
-  fs(): Directory {
-    return new Directory({
-      queryTree: [
-        ...this._queryTree,
-        {
-          operation: "fs",
-        },
-      ],
-      host: this.clientHost,
-      sessionToken: this.sessionToken,
-    });
-  }
-
-  /**
    * Retrieves a hostname which can be used by clients to reach this container.
    *
    * Currently experimental; set _EXPERIMENTAL_DAGGER_SERVICES_DNS=0 to disable.
    */
   async hostname(): Promise<string> {
+    if (this._hostname) {
+      return this._hostname;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -1049,26 +1243,13 @@ export class Container extends BaseClient {
   }
 
   /**
-   * A unique identifier for this container.
-   */
-  async id(): Promise<ContainerID> {
-    const response: Awaited<ContainerID> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "id",
-        },
-      ],
-      this.client
-    );
-
-    return response;
-  }
-
-  /**
    * The unique image reference which can only be retrieved immediately after the 'Container.From' call.
    */
   async imageRef(): Promise<string> {
+    if (this._imageRef) {
+      return this._imageRef;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -1091,7 +1272,7 @@ export class Container extends BaseClient {
    * @param opts.tag Identifies the tag to import from the archive, if the archive bundles
    * multiple tags.
    */
-  import(source: File, opts?: ContainerImportOpts): Container {
+  import_(source: File, opts?: ContainerImportOpts): Container {
     return new Container({
       queryTree: [
         ...this._queryTree,
@@ -1109,6 +1290,10 @@ export class Container extends BaseClient {
    * Retrieves the value of the specified label.
    */
   async label(name: string): Promise<string> {
+    if (this._label) {
+      return this._label;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -1127,17 +1312,36 @@ export class Container extends BaseClient {
    * Retrieves the list of labels passed to container.
    */
   async labels(): Promise<Label[]> {
-    const response: Awaited<Label[]> = await computeQuery(
+    type labels = {
+      name: string;
+      value: string;
+    };
+
+    const response: Awaited<labels[]> = await computeQuery(
       [
         ...this._queryTree,
         {
           operation: "labels",
         },
+        {
+          operation: "name value",
+        },
       ],
       this.client
     );
 
-    return response;
+    return response.map(
+      (r) =>
+        new Label(
+          {
+            queryTree: this.queryTree,
+            host: this.clientHost,
+            sessionToken: this.sessionToken,
+          },
+          r.name,
+          r.value
+        )
+    );
   }
 
   /**
@@ -1181,6 +1385,10 @@ export class Container extends BaseClient {
    * The platform this container executes and publishes as.
    */
   async platform(): Promise<Platform> {
+    if (this._platform) {
+      return this._platform;
+    }
+
     const response: Awaited<Platform> = await computeQuery(
       [
         ...this._queryTree,
@@ -1209,14 +1417,26 @@ export class Container extends BaseClient {
    * cache, that will be used (this can result in a mix of compression algorithms for
    * different layers). If this is unset and a layer has no compressed blob in the
    * engine's cache, then it will be compressed using Gzip.
+   * @param opts.mediaTypes Use the specified media types for the published image's layers. Defaults to OCI, which
+   * is largely compatible with most recent registries, but Docker may be needed for older
+   * registries without OCI support.
    */
   async publish(address: string, opts?: ContainerPublishOpts): Promise<string> {
+    if (this._publish) {
+      return this._publish;
+    }
+
+    const metadata: Metadata = {
+      forcedCompression: { is_enum: true },
+      mediaTypes: { is_enum: true },
+    };
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
         {
           operation: "publish",
-          args: { address, ...opts },
+          args: { address, ...opts, __metadata: metadata },
         },
       ],
       this.client
@@ -1247,6 +1467,10 @@ export class Container extends BaseClient {
    * Will execute default command if none is set, or error if there's no default.
    */
   async stderr(): Promise<string> {
+    if (this._stderr) {
+      return this._stderr;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -1266,6 +1490,10 @@ export class Container extends BaseClient {
    * Will execute default command if none is set, or error if there's no default.
    */
   async stdout(): Promise<string> {
+    if (this._stdout) {
+      return this._stdout;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -1302,6 +1530,10 @@ export class Container extends BaseClient {
    * Retrieves the user to be set for all commands.
    */
   async user(): Promise<string> {
+    if (this._user) {
+      return this._user;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -1454,30 +1686,16 @@ export class Container extends BaseClient {
     port: number,
     opts?: ContainerWithExposedPortOpts
   ): Container {
+    const metadata: Metadata = {
+      protocol: { is_enum: true },
+    };
+
     return new Container({
       queryTree: [
         ...this._queryTree,
         {
           operation: "withExposedPort",
-          args: { port, ...opts },
-        },
-      ],
-      host: this.clientHost,
-      sessionToken: this.sessionToken,
-    });
-  }
-
-  /**
-   * Initializes this container from this DirectoryID.
-   * @deprecated Replaced by withRootfs.
-   */
-  withFS(id: Directory): Container {
-    return new Container({
-      queryTree: [
-        ...this._queryTree,
-        {
-          operation: "withFS",
-          args: { id },
+          args: { port, ...opts, __metadata: metadata },
         },
       ],
       host: this.clientHost,
@@ -1509,6 +1727,23 @@ export class Container extends BaseClient {
         {
           operation: "withFile",
           args: { path, source, ...opts },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Indicate that subsequent operations should be featured more prominently in
+   * the UI.
+   */
+  withFocus(): Container {
+    return new Container({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "withFocus",
         },
       ],
       host: this.clientHost,
@@ -1556,12 +1791,16 @@ export class Container extends BaseClient {
     cache: CacheVolume,
     opts?: ContainerWithMountedCacheOpts
   ): Container {
+    const metadata: Metadata = {
+      sharing: { is_enum: true },
+    };
+
     return new Container({
       queryTree: [
         ...this._queryTree,
         {
           operation: "withMountedCache",
-          args: { path, cache, ...opts },
+          args: { path, cache, ...opts, __metadata: metadata },
         },
       ],
       host: this.clientHost,
@@ -1634,6 +1873,10 @@ export class Container extends BaseClient {
    * The user and group can either be an ID (1000:1000) or a name (foo:bar).
    *
    * If the group is omitted, it defaults to the same as the user.
+   * @param opts.mode Permission given to the mounted secret (e.g., 0600).
+   * This option requires an owner to be set to be active.
+   *
+   * Default: 0400.
    */
   withMountedSecret(
     path: string,
@@ -1726,13 +1969,13 @@ export class Container extends BaseClient {
   /**
    * Initializes this container from this DirectoryID.
    */
-  withRootfs(id: Directory): Container {
+  withRootfs(directory: Directory): Container {
     return new Container({
       queryTree: [
         ...this._queryTree,
         {
           operation: "withRootfs",
-          args: { id },
+          args: { directory },
         },
       ],
       host: this.clientHost,
@@ -1880,12 +2123,35 @@ export class Container extends BaseClient {
     port: number,
     opts?: ContainerWithoutExposedPortOpts
   ): Container {
+    const metadata: Metadata = {
+      protocol: { is_enum: true },
+    };
+
     return new Container({
       queryTree: [
         ...this._queryTree,
         {
           operation: "withoutExposedPort",
-          args: { port, ...opts },
+          args: { port, ...opts, __metadata: metadata },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Indicate that subsequent operations should not be featured more prominently
+   * in the UI.
+   *
+   * This is the initial state of all containers.
+   */
+  withoutFocus(): Container {
+    return new Container({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "withoutFocus",
         },
       ],
       host: this.clientHost,
@@ -1970,6 +2236,10 @@ export class Container extends BaseClient {
    * Retrieves the working directory for all commands.
    */
   async workdir(): Promise<string> {
+    if (this._workdir) {
+      return this._workdir;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -1984,25 +2254,9 @@ export class Container extends BaseClient {
   }
 
   /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
+   * Call the provided function with current Container.
    *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
+   * This is useful for reusability and readability by not breaking the calling chain.
    */
   with(arg: (param: Container) => Container) {
     return arg(this);
@@ -2012,8 +2266,74 @@ export class Container extends BaseClient {
 /**
  * A directory.
  */
-
 export class Directory extends BaseClient {
+  private readonly _id?: DirectoryID = undefined;
+  private readonly _export?: boolean = undefined;
+  private readonly _sync?: DirectoryID = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _id?: DirectoryID,
+    _export?: boolean,
+    _sync?: DirectoryID
+  ) {
+    super(parent);
+
+    this._id = _id;
+    this._export = _export;
+    this._sync = _sync;
+  }
+
+  /**
+   * The content-addressed identifier of the directory.
+   */
+  async id(): Promise<DirectoryID> {
+    if (this._id) {
+      return this._id;
+    }
+
+    const response: Awaited<DirectoryID> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "id",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * Load the directory as a Dagger module
+   *
+   * sourceSubpath is an optional parameter that, if set, points to a subpath of this
+   * directory that contains the module's source code. This is needed when the module
+   * code is in a subdirectory but requires parent directories to be loaded in order
+   * to execute. For example, the module source code may need a go.mod, project.toml,
+   * package.json, etc. file from a parent directory.
+   *
+   * If sourceSubpath is not set, the module source code is loaded from the root of
+   * the directory.
+   */
+  asModule(opts?: DirectoryAsModuleOpts): Module_ {
+    return new Module_({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "asModule",
+          args: { ...opts },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
   /**
    * Gets the difference between this directory and an another directory.
    * @param other Identifier of the directory to compare.
@@ -2100,6 +2420,10 @@ export class Directory extends BaseClient {
    * @param path Location of the copied directory (e.g., "logs/").
    */
   async export(path: string): Promise<boolean> {
+    if (this._export) {
+      return this._export;
+    }
+
     const response: Awaited<boolean> = await computeQuery(
       [
         ...this._queryTree,
@@ -2133,23 +2457,6 @@ export class Directory extends BaseClient {
   }
 
   /**
-   * The content-addressed identifier of the directory.
-   */
-  async id(): Promise<DirectoryID> {
-    const response: Awaited<DirectoryID> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "id",
-        },
-      ],
-      this.client
-    );
-
-    return response;
-  }
-
-  /**
    * Creates a named sub-pipeline
    * @param name Pipeline name.
    * @param opts.description Pipeline description.
@@ -2167,6 +2474,23 @@ export class Directory extends BaseClient {
       host: this.clientHost,
       sessionToken: this.sessionToken,
     });
+  }
+
+  /**
+   * Force evaluation in the engine.
+   */
+  async sync(): Promise<Directory> {
+    await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "sync",
+        },
+      ],
+      this.client
+    );
+
+    return this;
   }
 
   /**
@@ -2327,25 +2651,9 @@ export class Directory extends BaseClient {
   }
 
   /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
+   * Call the provided function with current Directory.
    *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
+   * This is useful for reusability and readability by not breaking the calling chain.
    */
   with(arg: (param: Directory) => Directory) {
     return arg(this);
@@ -2355,12 +2663,32 @@ export class Directory extends BaseClient {
 /**
  * A simple key value object that represents an environment variable.
  */
-
 export class EnvVariable extends BaseClient {
+  private readonly _name?: string = undefined;
+  private readonly _value?: string = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _name?: string,
+    _value?: string
+  ) {
+    super(parent);
+
+    this._name = _name;
+    this._value = _value;
+  }
+
   /**
    * The environment variable name.
    */
   async name(): Promise<string> {
+    if (this._name) {
+      return this._name;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -2378,6 +2706,10 @@ export class EnvVariable extends BaseClient {
    * The environment variable value.
    */
   async value(): Promise<string> {
+    if (this._value) {
+      return this._value;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -2390,42 +2722,149 @@ export class EnvVariable extends BaseClient {
 
     return response;
   }
+}
+
+/**
+ * A definition of a field on a custom object defined in a Module.
+ * A field on an object has a static value, as opposed to a function on an
+ * object whose value is computed by invoking code (and can accept arguments).
+ */
+export class FieldTypeDef extends BaseClient {
+  private readonly _description?: string = undefined;
+  private readonly _name?: string = undefined;
 
   /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
-   *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
+   * Constructor is used for internal usage only, do not create object from it.
    */
-  with(arg: (param: EnvVariable) => EnvVariable) {
-    return arg(this);
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _description?: string,
+    _name?: string
+  ) {
+    super(parent);
+
+    this._description = _description;
+    this._name = _name;
+  }
+
+  /**
+   * A doc string for the field, if any
+   */
+  async description(): Promise<string> {
+    if (this._description) {
+      return this._description;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "description",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * The name of the field in the object
+   */
+  async name(): Promise<string> {
+    if (this._name) {
+      return this._name;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "name",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * The type of the field
+   */
+  typeDef(): TypeDef {
+    return new TypeDef({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "typeDef",
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
   }
 }
 
 /**
  * A file.
  */
-
 export class File extends BaseClient {
+  private readonly _id?: FileID = undefined;
+  private readonly _contents?: string = undefined;
+  private readonly _export?: boolean = undefined;
+  private readonly _size?: number = undefined;
+  private readonly _sync?: FileID = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _id?: FileID,
+    _contents?: string,
+    _export?: boolean,
+    _size?: number,
+    _sync?: FileID
+  ) {
+    super(parent);
+
+    this._id = _id;
+    this._contents = _contents;
+    this._export = _export;
+    this._size = _size;
+    this._sync = _sync;
+  }
+
+  /**
+   * Retrieves the content-addressed identifier of the file.
+   */
+  async id(): Promise<FileID> {
+    if (this._id) {
+      return this._id;
+    }
+
+    const response: Awaited<FileID> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "id",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
   /**
    * Retrieves the contents of the file.
    */
   async contents(): Promise<string> {
+    if (this._contents) {
+      return this._contents;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -2442,60 +2881,36 @@ export class File extends BaseClient {
   /**
    * Writes the file to a file path on the host.
    * @param path Location of the written directory (e.g., "output.txt").
+   * @param opts.allowParentDirPath If allowParentDirPath is true, the path argument can be a directory path, in which case
+   * the file will be created in that directory.
    */
-  async export(path: string): Promise<boolean> {
+  async export(path: string, opts?: FileExportOpts): Promise<boolean> {
+    if (this._export) {
+      return this._export;
+    }
+
     const response: Awaited<boolean> = await computeQuery(
       [
         ...this._queryTree,
         {
           operation: "export",
-          args: { path },
+          args: { path, ...opts },
         },
       ],
       this.client
     );
 
     return response;
-  }
-
-  /**
-   * Retrieves the content-addressed identifier of the file.
-   */
-  async id(): Promise<FileID> {
-    const response: Awaited<FileID> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "id",
-        },
-      ],
-      this.client
-    );
-
-    return response;
-  }
-
-  /**
-   * Retrieves a secret referencing the contents of this file.
-   * @deprecated insecure, leaves secret in cache. Superseded by setSecret
-   */
-  secret(): Secret {
-    return new Secret({
-      queryTree: [
-        ...this._queryTree,
-        {
-          operation: "secret",
-        },
-      ],
-      host: this.clientHost,
-      sessionToken: this.sessionToken,
-    });
   }
 
   /**
    * Gets the size of the file, in bytes.
    */
   async size(): Promise<number> {
+    if (this._size) {
+      return this._size;
+    }
+
     const response: Awaited<number> = await computeQuery(
       [
         ...this._queryTree,
@@ -2507,6 +2922,23 @@ export class File extends BaseClient {
     );
 
     return response;
+  }
+
+  /**
+   * Force evaluation in the engine.
+   */
+  async sync(): Promise<File> {
+    await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "sync",
+        },
+      ],
+      this.client
+    );
+
+    return this;
   }
 
   /**
@@ -2530,25 +2962,9 @@ export class File extends BaseClient {
   }
 
   /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
+   * Call the provided function with current File.
    *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
+   * This is useful for reusability and readability by not breaking the calling chain.
    */
   with(arg: (param: File) => File) {
     return arg(this);
@@ -2556,25 +2972,562 @@ export class File extends BaseClient {
 }
 
 /**
- * A git ref (tag, branch or commit).
+ * Function represents a resolver provided by a Module.
+ *
+ * A function always evaluates against a parent object and is given a set of
+ * named arguments.
  */
+export class Function_ extends BaseClient {
+  private readonly _id?: FunctionID = undefined;
+  private readonly _call?: JSON = undefined;
+  private readonly _description?: string = undefined;
+  private readonly _name?: string = undefined;
 
-export class GitRef extends BaseClient {
   /**
-   * The digest of the current value of this ref.
+   * Constructor is used for internal usage only, do not create object from it.
    */
-  async digest(): Promise<string> {
-    const response: Awaited<string> = await computeQuery(
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _id?: FunctionID,
+    _call?: JSON,
+    _description?: string,
+    _name?: string
+  ) {
+    super(parent);
+
+    this._id = _id;
+    this._call = _call;
+    this._description = _description;
+    this._name = _name;
+  }
+
+  /**
+   * The ID of the function
+   */
+  async id(): Promise<FunctionID> {
+    if (this._id) {
+      return this._id;
+    }
+
+    const response: Awaited<FunctionID> = await computeQuery(
       [
         ...this._queryTree,
         {
-          operation: "digest",
+          operation: "id",
         },
       ],
       this.client
     );
 
     return response;
+  }
+
+  /**
+   * Arguments accepted by this function, if any
+   */
+  async args(): Promise<FunctionArg[]> {
+    type args = {
+      defaultValue: JSON;
+      description: string;
+      name: string;
+    };
+
+    const response: Awaited<args[]> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "args",
+        },
+        {
+          operation: "defaultValue description name",
+        },
+      ],
+      this.client
+    );
+
+    return response.map(
+      (r) =>
+        new FunctionArg(
+          {
+            queryTree: this.queryTree,
+            host: this.clientHost,
+            sessionToken: this.sessionToken,
+          },
+          r.defaultValue,
+          r.description,
+          r.name
+        )
+    );
+  }
+
+  /**
+   * Execute this function using dynamic input+output types.
+   *
+   * Typically, it's preferable to invoke a function using a type
+   * safe graphql query rather than using this call field. However,
+   * call is useful for some advanced use cases where dynamically
+   * loading arbitrary modules and invoking functions in them is
+   * required.
+   */
+  async call(opts?: FunctionCallOpts): Promise<JSON> {
+    if (this._call) {
+      return this._call;
+    }
+
+    const response: Awaited<JSON> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "call",
+          args: { ...opts },
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * A doc string for the function, if any
+   */
+  async description(): Promise<string> {
+    if (this._description) {
+      return this._description;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "description",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * The name of the function
+   */
+  async name(): Promise<string> {
+    if (this._name) {
+      return this._name;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "name",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * The type returned by this function
+   */
+  returnType(): TypeDef {
+    return new TypeDef({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "returnType",
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Returns the function with the provided argument
+   * @param name The name of the argument
+   * @param typeDef The type of the argument
+   * @param opts.description A doc string for the argument, if any
+   * @param opts.defaultValue A default value to use for this argument if not explicitly set by the caller, if any
+   */
+  withArg(
+    name: string,
+    typeDef: TypeDef,
+    opts?: FunctionWithArgOpts
+  ): Function_ {
+    return new Function_({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "withArg",
+          args: { name, typeDef, ...opts },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Returns the function with the doc string
+   */
+  withDescription(description: string): Function_ {
+    return new Function_({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "withDescription",
+          args: { description },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Call the provided function with current Function.
+   *
+   * This is useful for reusability and readability by not breaking the calling chain.
+   */
+  with(arg: (param: Function_) => Function_) {
+    return arg(this);
+  }
+}
+
+/**
+ * An argument accepted by a function.
+ *
+ * This is a specification for an argument at function definition time, not an
+ * argument passed at function call time.
+ */
+export class FunctionArg extends BaseClient {
+  private readonly _defaultValue?: JSON = undefined;
+  private readonly _description?: string = undefined;
+  private readonly _name?: string = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _defaultValue?: JSON,
+    _description?: string,
+    _name?: string
+  ) {
+    super(parent);
+
+    this._defaultValue = _defaultValue;
+    this._description = _description;
+    this._name = _name;
+  }
+
+  /**
+   * A default value to use for this argument when not explicitly set by the caller, if any
+   */
+  async defaultValue(): Promise<JSON> {
+    if (this._defaultValue) {
+      return this._defaultValue;
+    }
+
+    const response: Awaited<JSON> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "defaultValue",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * A doc string for the argument, if any
+   */
+  async description(): Promise<string> {
+    if (this._description) {
+      return this._description;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "description",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * The name of the argument
+   */
+  async name(): Promise<string> {
+    if (this._name) {
+      return this._name;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "name",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * The type of the argument
+   */
+  typeDef(): TypeDef {
+    return new TypeDef({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "typeDef",
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+}
+
+export class FunctionCall extends BaseClient {
+  private readonly _name?: string = undefined;
+  private readonly _parent?: JSON = undefined;
+  private readonly _parentName?: string = undefined;
+  private readonly _returnValue?: Void = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _name?: string,
+    _parent?: JSON,
+    _parentName?: string,
+    _returnValue?: Void
+  ) {
+    super(parent);
+
+    this._name = _name;
+    this._parent = _parent;
+    this._parentName = _parentName;
+    this._returnValue = _returnValue;
+  }
+
+  /**
+   * The argument values the function is being invoked with.
+   */
+  async inputArgs(): Promise<FunctionCallArgValue[]> {
+    type inputArgs = {
+      name: string;
+      value: JSON;
+    };
+
+    const response: Awaited<inputArgs[]> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "inputArgs",
+        },
+        {
+          operation: "name value",
+        },
+      ],
+      this.client
+    );
+
+    return response.map(
+      (r) =>
+        new FunctionCallArgValue(
+          {
+            queryTree: this.queryTree,
+            host: this.clientHost,
+            sessionToken: this.sessionToken,
+          },
+          r.name,
+          r.value
+        )
+    );
+  }
+
+  /**
+   * The name of the function being called.
+   */
+  async name(): Promise<string> {
+    if (this._name) {
+      return this._name;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "name",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * The value of the parent object of the function being called.
+   * If the function is "top-level" to the module, this is always an empty object.
+   */
+  async parent(): Promise<JSON> {
+    if (this._parent) {
+      return this._parent;
+    }
+
+    const response: Awaited<JSON> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "parent",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * The name of the parent object of the function being called.
+   * If the function is "top-level" to the module, this is the name of the module.
+   */
+  async parentName(): Promise<string> {
+    if (this._parentName) {
+      return this._parentName;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "parentName",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * Set the return value of the function call to the provided value.
+   * The value should be a string of the JSON serialization of the return value.
+   */
+  async returnValue(value: JSON): Promise<Void> {
+    if (this._returnValue) {
+      return this._returnValue;
+    }
+
+    const response: Awaited<Void> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "returnValue",
+          args: { value },
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+}
+
+export class FunctionCallArgValue extends BaseClient {
+  private readonly _name?: string = undefined;
+  private readonly _value?: JSON = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _name?: string,
+    _value?: JSON
+  ) {
+    super(parent);
+
+    this._name = _name;
+    this._value = _value;
+  }
+
+  /**
+   * The name of the argument.
+   */
+  async name(): Promise<string> {
+    if (this._name) {
+      return this._name;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "name",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * The value of the argument represented as a string of the JSON serialization.
+   */
+  async value(): Promise<JSON> {
+    if (this._value) {
+      return this._value;
+    }
+
+    const response: Awaited<JSON> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "value",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+}
+
+/**
+ * A git ref (tag, branch or commit).
+ */
+export class GitRef extends BaseClient {
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(parent?: {
+    queryTree?: QueryTree[];
+    host?: string;
+    sessionToken?: string;
+  }) {
+    super(parent);
   }
 
   /**
@@ -2593,38 +3546,23 @@ export class GitRef extends BaseClient {
       sessionToken: this.sessionToken,
     });
   }
-
-  /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
-   *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
-   */
-  with(arg: (param: GitRef) => GitRef) {
-    return arg(this);
-  }
 }
 
 /**
  * A git repository.
  */
-
 export class GitRepository extends BaseClient {
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(parent?: {
+    queryTree?: QueryTree[];
+    host?: string;
+    sessionToken?: string;
+  }) {
+    super(parent);
+  }
+
   /**
    * Returns details on one branch.
    * @param name Branch's name (e.g., "main").
@@ -2641,23 +3579,6 @@ export class GitRepository extends BaseClient {
       host: this.clientHost,
       sessionToken: this.sessionToken,
     });
-  }
-
-  /**
-   * Lists of branches on the repository.
-   */
-  async branches(): Promise<string[]> {
-    const response: Awaited<string[]> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "branches",
-        },
-      ],
-      this.client
-    );
-
-    return response;
   }
 
   /**
@@ -2695,55 +3616,23 @@ export class GitRepository extends BaseClient {
       sessionToken: this.sessionToken,
     });
   }
-
-  /**
-   * Lists of tags on the repository.
-   */
-  async tags(): Promise<string[]> {
-    const response: Awaited<string[]> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "tags",
-        },
-      ],
-      this.client
-    );
-
-    return response;
-  }
-
-  /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
-   *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
-   */
-  with(arg: (param: GitRepository) => GitRepository) {
-    return arg(this);
-  }
 }
 
 /**
  * Information about the host execution environment.
  */
-
 export class Host extends BaseClient {
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(parent?: {
+    queryTree?: QueryTree[];
+    host?: string;
+    sessionToken?: string;
+  }) {
+    super(parent);
+  }
+
   /**
    * Accesses a directory on the host.
    * @param path Location of the directory to access (e.g., ".").
@@ -2765,16 +3654,36 @@ export class Host extends BaseClient {
   }
 
   /**
-   * Accesses an environment variable on the host.
-   * @param name Name of the environment variable (e.g., "PATH").
+   * Accesses a file on the host.
+   * @param path Location of the file to retrieve (e.g., "README.md").
    */
-  envVariable(name: string): HostVariable {
-    return new HostVariable({
+  file(path: string): File {
+    return new File({
       queryTree: [
         ...this._queryTree,
         {
-          operation: "envVariable",
-          args: { name },
+          operation: "file",
+          args: { path },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Sets a secret given a user-defined name and the file path on the host, and returns the secret.
+   * The file is limited to a size of 512000 bytes.
+   * @param name The user defined name for this secret.
+   * @param path Location of the file to set as a secret.
+   */
+  setSecretFile(name: string, path: string): Secret {
+    return new Secret({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "setSecretFile",
+          args: { name, path },
         },
       ],
       host: this.clientHost,
@@ -2799,127 +3708,37 @@ export class Host extends BaseClient {
       sessionToken: this.sessionToken,
     });
   }
-
-  /**
-   * Retrieves the current working directory on the host.
-   * @param opts.exclude Exclude artifacts that match the given pattern (e.g., ["node_modules/", ".git*"]).
-   * @param opts.include Include only artifacts that match the given pattern (e.g., ["app/", "package.*"]).
-   * @deprecated Use directory with path set to '.' instead.
-   */
-  workdir(opts?: HostWorkdirOpts): Directory {
-    return new Directory({
-      queryTree: [
-        ...this._queryTree,
-        {
-          operation: "workdir",
-          args: { ...opts },
-        },
-      ],
-      host: this.clientHost,
-      sessionToken: this.sessionToken,
-    });
-  }
-
-  /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
-   *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
-   */
-  with(arg: (param: Host) => Host) {
-    return arg(this);
-  }
-}
-
-/**
- * An environment variable on the host environment.
- */
-
-export class HostVariable extends BaseClient {
-  /**
-   * A secret referencing the value of this variable.
-   * @deprecated been superseded by setSecret
-   */
-  secret(): Secret {
-    return new Secret({
-      queryTree: [
-        ...this._queryTree,
-        {
-          operation: "secret",
-        },
-      ],
-      host: this.clientHost,
-      sessionToken: this.sessionToken,
-    });
-  }
-
-  /**
-   * The value of this variable.
-   */
-  async value(): Promise<string> {
-    const response: Awaited<string> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "value",
-        },
-      ],
-      this.client
-    );
-
-    return response;
-  }
-
-  /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
-   *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
-   */
-  with(arg: (param: HostVariable) => HostVariable) {
-    return arg(this);
-  }
 }
 
 /**
  * A simple key value object that represents a label.
  */
-
 export class Label extends BaseClient {
+  private readonly _name?: string = undefined;
+  private readonly _value?: string = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _name?: string,
+    _value?: string
+  ) {
+    super(parent);
+
+    this._name = _name;
+    this._value = _value;
+  }
+
   /**
    * The label name.
    */
   async name(): Promise<string> {
+    if (this._name) {
+      return this._name;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -2937,6 +3756,10 @@ export class Label extends BaseClient {
    * The label value.
    */
   async value(): Promise<string> {
+    if (this._value) {
+      return this._value;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -2949,42 +3772,493 @@ export class Label extends BaseClient {
 
     return response;
   }
+}
+
+/**
+ * A definition of a list type in a Module.
+ */
+export class ListTypeDef extends BaseClient {
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(parent?: {
+    queryTree?: QueryTree[];
+    host?: string;
+    sessionToken?: string;
+  }) {
+    super(parent);
+  }
 
   /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
-   *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
+   * The type of the elements in the list
    */
-  with(arg: (param: Label) => Label) {
+  elementTypeDef(): TypeDef {
+    return new TypeDef({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "elementTypeDef",
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+}
+
+export class Module_ extends BaseClient {
+  private readonly _id?: ModuleID = undefined;
+  private readonly _description?: string = undefined;
+  private readonly _name?: string = undefined;
+  private readonly _sdk?: string = undefined;
+  private readonly _serve?: Void = undefined;
+  private readonly _sourceDirectorySubPath?: string = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _id?: ModuleID,
+    _description?: string,
+    _name?: string,
+    _sdk?: string,
+    _serve?: Void,
+    _sourceDirectorySubPath?: string
+  ) {
+    super(parent);
+
+    this._id = _id;
+    this._description = _description;
+    this._name = _name;
+    this._sdk = _sdk;
+    this._serve = _serve;
+    this._sourceDirectorySubPath = _sourceDirectorySubPath;
+  }
+
+  /**
+   * The ID of the module
+   */
+  async id(): Promise<ModuleID> {
+    if (this._id) {
+      return this._id;
+    }
+
+    const response: Awaited<ModuleID> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "id",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * Modules used by this module
+   */
+  async dependencies(): Promise<Module_[]> {
+    type dependencies = {
+      id: ModuleID;
+    };
+
+    const response: Awaited<dependencies[]> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "dependencies",
+        },
+        {
+          operation: "id",
+        },
+      ],
+      this.client
+    );
+
+    return response.map(
+      (r) =>
+        new Module_(
+          {
+            queryTree: this.queryTree,
+            host: this.clientHost,
+            sessionToken: this.sessionToken,
+          },
+          r.id
+        )
+    );
+  }
+
+  /**
+   * The dependencies as configured by the module
+   */
+  async dependencyConfig(): Promise<string[]> {
+    const response: Awaited<string[]> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "dependencyConfig",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * The doc string of the module, if any
+   */
+  async description(): Promise<string> {
+    if (this._description) {
+      return this._description;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "description",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * The name of the module
+   */
+  async name(): Promise<string> {
+    if (this._name) {
+      return this._name;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "name",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * Objects served by this module
+   */
+  async objects(): Promise<TypeDef[]> {
+    type objects = {
+      id: TypeDefID;
+    };
+
+    const response: Awaited<objects[]> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "objects",
+        },
+        {
+          operation: "id",
+        },
+      ],
+      this.client
+    );
+
+    return response.map(
+      (r) =>
+        new TypeDef(
+          {
+            queryTree: this.queryTree,
+            host: this.clientHost,
+            sessionToken: this.sessionToken,
+          },
+          r.id
+        )
+    );
+  }
+
+  /**
+   * The SDK used by this module
+   */
+  async sdk(): Promise<string> {
+    if (this._sdk) {
+      return this._sdk;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "sdk",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * Serve a module's API in the current session.
+   *     Note: this can only be called once per session.
+   *     In the future, it could return a stream or service to remove the side effect.
+   */
+  async serve(opts?: ModuleServeOpts): Promise<Void> {
+    if (this._serve) {
+      return this._serve;
+    }
+
+    const response: Awaited<Void> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "serve",
+          args: { ...opts },
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * The directory containing the module's source code
+   */
+  sourceDirectory(): Directory {
+    return new Directory({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "sourceDirectory",
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * The module's subpath within the source directory
+   */
+  async sourceDirectorySubPath(): Promise<string> {
+    if (this._sourceDirectorySubPath) {
+      return this._sourceDirectorySubPath;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "sourceDirectorySubPath",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * This module plus the given Object type and associated functions
+   */
+  withObject(object: TypeDef): Module_ {
+    return new Module_({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "withObject",
+          args: { object },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Call the provided function with current Module.
+   *
+   * This is useful for reusability and readability by not breaking the calling chain.
+   */
+  with(arg: (param: Module_) => Module_) {
     return arg(this);
+  }
+}
+
+/**
+ * A definition of a custom object defined in a Module.
+ */
+export class ObjectTypeDef extends BaseClient {
+  private readonly _description?: string = undefined;
+  private readonly _name?: string = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _description?: string,
+    _name?: string
+  ) {
+    super(parent);
+
+    this._description = _description;
+    this._name = _name;
+  }
+
+  /**
+   * The doc string for the object, if any
+   */
+  async description(): Promise<string> {
+    if (this._description) {
+      return this._description;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "description",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * Static fields defined on this object, if any
+   */
+  async fields(): Promise<FieldTypeDef[]> {
+    type fields = {
+      description: string;
+      name: string;
+    };
+
+    const response: Awaited<fields[]> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "fields",
+        },
+        {
+          operation: "description name",
+        },
+      ],
+      this.client
+    );
+
+    return response.map(
+      (r) =>
+        new FieldTypeDef(
+          {
+            queryTree: this.queryTree,
+            host: this.clientHost,
+            sessionToken: this.sessionToken,
+          },
+          r.description,
+          r.name
+        )
+    );
+  }
+
+  /**
+   * Functions defined on this object, if any
+   */
+  async functions(): Promise<Function_[]> {
+    type functions = {
+      id: FunctionID;
+    };
+
+    const response: Awaited<functions[]> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "functions",
+        },
+        {
+          operation: "id",
+        },
+      ],
+      this.client
+    );
+
+    return response.map(
+      (r) =>
+        new Function_(
+          {
+            queryTree: this.queryTree,
+            host: this.clientHost,
+            sessionToken: this.sessionToken,
+          },
+          r.id
+        )
+    );
+  }
+
+  /**
+   * The name of the object
+   */
+  async name(): Promise<string> {
+    if (this._name) {
+      return this._name;
+    }
+
+    const response: Awaited<string> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "name",
+        },
+      ],
+      this.client
+    );
+
+    return response;
   }
 }
 
 /**
  * A port exposed by a container.
  */
-
 export class Port extends BaseClient {
+  private readonly _description?: string = undefined;
+  private readonly _port?: number = undefined;
+  private readonly _protocol?: NetworkProtocol = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _description?: string,
+    _port?: number,
+    _protocol?: NetworkProtocol
+  ) {
+    super(parent);
+
+    this._description = _description;
+    this._port = _port;
+    this._protocol = _protocol;
+  }
+
   /**
    * The port description.
    */
   async description(): Promise<string> {
+    if (this._description) {
+      return this._description;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -3002,6 +4276,10 @@ export class Port extends BaseClient {
    * The port number.
    */
   async port(): Promise<number> {
+    if (this._port) {
+      return this._port;
+    }
+
     const response: Awaited<number> = await computeQuery(
       [
         ...this._queryTree,
@@ -3019,6 +4297,10 @@ export class Port extends BaseClient {
    * The transport layer network protocol.
    */
   async protocol(): Promise<NetworkProtocol> {
+    if (this._protocol) {
+      return this._protocol;
+    }
+
     const response: Awaited<NetworkProtocol> = await computeQuery(
       [
         ...this._queryTree,
@@ -3031,314 +4313,26 @@ export class Port extends BaseClient {
 
     return response;
   }
-
-  /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
-   *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
-   */
-  with(arg: (param: Port) => Port) {
-    return arg(this);
-  }
 }
 
-/**
- * A collection of Dagger resources that can be queried and invoked.
- */
-
-export class Project extends BaseClient {
-  /**
-   * Commands provided by this project
-   */
-  async commands(): Promise<ProjectCommand[]> {
-    const response: Awaited<ProjectCommand[]> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "commands",
-        },
-      ],
-      this.client
-    );
-
-    return response;
-  }
+export class Client extends BaseClient {
+  private readonly _checkVersionCompatibility?: boolean = undefined;
+  private readonly _defaultPlatform?: Platform = undefined;
 
   /**
-   * A unique identifier for this project.
+   * Constructor is used for internal usage only, do not create object from it.
    */
-  async id(): Promise<string> {
-    const response: Awaited<string> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "id",
-        },
-      ],
-      this.client
-    );
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _checkVersionCompatibility?: boolean,
+    _defaultPlatform?: Platform
+  ) {
+    super(parent);
 
-    return response;
+    this._checkVersionCompatibility = _checkVersionCompatibility;
+    this._defaultPlatform = _defaultPlatform;
   }
 
-  /**
-   * Initialize this project from the given directory and config path
-   */
-  load(source: Directory, configPath: string): Project {
-    return new Project({
-      queryTree: [
-        ...this._queryTree,
-        {
-          operation: "load",
-          args: { source, configPath },
-        },
-      ],
-      host: this.clientHost,
-      sessionToken: this.sessionToken,
-    });
-  }
-
-  /**
-   * Name of the project
-   */
-  async name(): Promise<string> {
-    const response: Awaited<string> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "name",
-        },
-      ],
-      this.client
-    );
-
-    return response;
-  }
-
-  /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
-   *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
-   */
-  with(arg: (param: Project) => Project) {
-    return arg(this);
-  }
-}
-
-/**
- * A command defined in a project that can be invoked from the CLI.
- */
-
-export class ProjectCommand extends BaseClient {
-  /**
-   * Documentation for what this command does.
-   */
-  async description(): Promise<string> {
-    const response: Awaited<string> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "description",
-        },
-      ],
-      this.client
-    );
-
-    return response;
-  }
-
-  /**
-   * Flags accepted by this command.
-   */
-  async flags(): Promise<ProjectCommandFlag[]> {
-    const response: Awaited<ProjectCommandFlag[]> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "flags",
-        },
-      ],
-      this.client
-    );
-
-    return response;
-  }
-
-  /**
-   * A unique identifier for this command.
-   */
-  async id(): Promise<string> {
-    const response: Awaited<string> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "id",
-        },
-      ],
-      this.client
-    );
-
-    return response;
-  }
-
-  /**
-   * The name of the command.
-   */
-  async name(): Promise<string> {
-    const response: Awaited<string> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "name",
-        },
-      ],
-      this.client
-    );
-
-    return response;
-  }
-
-  /**
-   * Subcommands, if any, that this command provides.
-   */
-  async subcommands(): Promise<ProjectCommand[]> {
-    const response: Awaited<ProjectCommand[]> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "subcommands",
-        },
-      ],
-      this.client
-    );
-
-    return response;
-  }
-
-  /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
-   *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
-   */
-  with(arg: (param: ProjectCommand) => ProjectCommand) {
-    return arg(this);
-  }
-}
-
-/**
- * A flag accepted by a project command.
- */
-
-export class ProjectCommandFlag extends BaseClient {
-  /**
-   * Documentation for what this flag sets.
-   */
-  async description(): Promise<string> {
-    const response: Awaited<string> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "description",
-        },
-      ],
-      this.client
-    );
-
-    return response;
-  }
-
-  /**
-   * The name of the flag.
-   */
-  async name(): Promise<string> {
-    const response: Awaited<string> = await computeQuery(
-      [
-        ...this._queryTree,
-        {
-          operation: "name",
-        },
-      ],
-      this.client
-    );
-
-    return response;
-  }
-
-  /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
-   *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
-   */
-  with(arg: (param: ProjectCommandFlag) => ProjectCommandFlag) {
-    return arg(this);
-  }
-}
-
-export default class Client extends BaseClient {
   /**
    * Constructs a cache volume for a given cache key.
    * @param key A string identifier to target this cache volume (e.g., "modules-cache").
@@ -3358,6 +4352,25 @@ export default class Client extends BaseClient {
   }
 
   /**
+   * Checks if the current Dagger Engine is compatible with an SDK's required version.
+   * @param version The SDK's required version.
+   */
+  async checkVersionCompatibility(version: string): Promise<boolean> {
+    const response: Awaited<boolean> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "checkVersionCompatibility",
+          args: { version },
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
    * Loads a container from ID.
    *
    * Null ID returns an empty container (scratch).
@@ -3371,6 +4384,40 @@ export default class Client extends BaseClient {
         {
           operation: "container",
           args: { ...opts },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * The FunctionCall context that the SDK caller is currently executing in.
+   * If the caller is not currently executing in a function, this will return
+   * an error.
+   */
+  currentFunctionCall(): FunctionCall {
+    return new FunctionCall({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "currentFunctionCall",
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * The module currently being served in the session, if any.
+   */
+  currentModule(): Module_ {
+    return new Module_({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "currentModule",
         },
       ],
       host: this.clientHost,
@@ -3421,6 +4468,23 @@ export default class Client extends BaseClient {
         ...this._queryTree,
         {
           operation: "file",
+          args: { id },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Load a function by ID
+   */
+  function_(id: FunctionID): Function_ {
+    return new Function_({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "function",
           args: { id },
         },
       ],
@@ -3487,6 +4551,40 @@ export default class Client extends BaseClient {
   }
 
   /**
+   * Load a module by ID, or create a new one if id is unset.
+   */
+  module_(opts?: ClientModuleOpts): Module_ {
+    return new Module_({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "module",
+          args: { ...opts },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Create a new function from the provided definition.
+   */
+  newFunction(name: string, returnType: TypeDef): Function_ {
+    return new Function_({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "newFunction",
+          args: { name, returnType },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
    * Creates a named sub-pipeline.
    * @param name Pipeline name.
    * @param opts.description Pipeline description.
@@ -3499,40 +4597,6 @@ export default class Client extends BaseClient {
         {
           operation: "pipeline",
           args: { name, ...opts },
-        },
-      ],
-      host: this.clientHost,
-      sessionToken: this.sessionToken,
-    });
-  }
-
-  /**
-   * Load a project from ID.
-   */
-  project(opts?: ClientProjectOpts): Project {
-    return new Project({
-      queryTree: [
-        ...this._queryTree,
-        {
-          operation: "project",
-          args: { ...opts },
-        },
-      ],
-      host: this.clientHost,
-      sessionToken: this.sessionToken,
-    });
-  }
-
-  /**
-   * Load a project command from ID.
-   */
-  projectCommand(opts?: ClientProjectCommandOpts): ProjectCommand {
-    return new ProjectCommand({
-      queryTree: [
-        ...this._queryTree,
-        {
-          operation: "projectCommand",
-          args: { ...opts },
         },
       ],
       host: this.clientHost,
@@ -3559,6 +4623,7 @@ export default class Client extends BaseClient {
 
   /**
    * Sets a secret given a user defined name to its plaintext and returns the secret.
+   * The plaintext value is limited to a size of 128000 bytes.
    * @param name The user defined name for this secret
    * @param plaintext The plaintext of the secret
    */
@@ -3592,17 +4657,59 @@ export default class Client extends BaseClient {
       sessionToken: this.sessionToken,
     });
   }
+  typeDef(opts?: ClientTypeDefOpts): TypeDef {
+    return new TypeDef({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "typeDef",
+          args: { ...opts },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Call the provided function with current Client.
+   *
+   * This is useful for reusability and readability by not breaking the calling chain.
+   */
+  with(arg: (param: Client) => Client) {
+    return arg(this);
+  }
 }
 
 /**
  * A reference to a secret value, which can be handled more safely than the value itself.
  */
-
 export class Secret extends BaseClient {
+  private readonly _id?: SecretID = undefined;
+  private readonly _plaintext?: string = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _id?: SecretID,
+    _plaintext?: string
+  ) {
+    super(parent);
+
+    this._id = _id;
+    this._plaintext = _plaintext;
+  }
+
   /**
    * The identifier for this secret.
    */
   async id(): Promise<SecretID> {
+    if (this._id) {
+      return this._id;
+    }
+
     const response: Awaited<SecretID> = await computeQuery(
       [
         ...this._queryTree,
@@ -3620,6 +4727,10 @@ export class Secret extends BaseClient {
    * The value of this secret.
    */
   async plaintext(): Promise<string> {
+    if (this._plaintext) {
+      return this._plaintext;
+    }
+
     const response: Awaited<string> = await computeQuery(
       [
         ...this._queryTree,
@@ -3632,39 +4743,74 @@ export class Secret extends BaseClient {
 
     return response;
   }
-
-  /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
-   *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
-   */
-  with(arg: (param: Secret) => Secret) {
-    return arg(this);
-  }
 }
 
 export class Socket extends BaseClient {
+  private readonly _id?: SocketID = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _id?: SocketID
+  ) {
+    super(parent);
+
+    this._id = _id;
+  }
+
   /**
    * The content-addressed identifier of the socket.
    */
   async id(): Promise<SocketID> {
+    if (this._id) {
+      return this._id;
+    }
+
     const response: Awaited<SocketID> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "id",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+}
+
+/**
+ * A definition of a parameter or return type in a Module.
+ */
+export class TypeDef extends BaseClient {
+  private readonly _id?: TypeDefID = undefined;
+  private readonly _kind?: TypeDefKind = undefined;
+  private readonly _optional?: boolean = undefined;
+
+  /**
+   * Constructor is used for internal usage only, do not create object from it.
+   */
+  constructor(
+    parent?: { queryTree?: QueryTree[]; host?: string; sessionToken?: string },
+    _id?: TypeDefID,
+    _kind?: TypeDefKind,
+    _optional?: boolean
+  ) {
+    super(parent);
+
+    this._id = _id;
+    this._kind = _kind;
+    this._optional = _optional;
+  }
+  async id(): Promise<TypeDefID> {
+    if (this._id) {
+      return this._id;
+    }
+
+    const response: Awaited<TypeDefID> = await computeQuery(
       [
         ...this._queryTree,
         {
@@ -3678,27 +4824,200 @@ export class Socket extends BaseClient {
   }
 
   /**
-   * Chain objects together
-   * @example
-   * ```ts
-   *	function AddAFewMounts(c) {
-   *			return c
-   *			.withMountedDirectory("/foo", new Client().host().directory("/Users/slumbering/forks/dagger"))
-   *			.withMountedDirectory("/bar", new Client().host().directory("/Users/slumbering/forks/dagger/sdk/nodejs"))
-   *	}
-   *
-   * connect(async (client) => {
-   *		const tree = await client
-   *			.container()
-   *			.from("alpine")
-   *			.withWorkdir("/foo")
-   *			.with(AddAFewMounts)
-   *			.withExec(["ls", "-lh"])
-   *			.stdout()
-   * })
-   *```
+   * If kind is LIST, the list-specific type definition.
+   * If kind is not LIST, this will be null.
    */
-  with(arg: (param: Socket) => Socket) {
+  asList(): ListTypeDef {
+    return new ListTypeDef({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "asList",
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * If kind is OBJECT, the object-specific type definition.
+   * If kind is not OBJECT, this will be null.
+   */
+  asObject(): ObjectTypeDef {
+    return new ObjectTypeDef({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "asObject",
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * The kind of type this is (e.g. primitive, list, object)
+   */
+  async kind(): Promise<TypeDefKind> {
+    if (this._kind) {
+      return this._kind;
+    }
+
+    const response: Awaited<TypeDefKind> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "kind",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * Whether this type can be set to null. Defaults to false.
+   */
+  async optional(): Promise<boolean> {
+    if (this._optional) {
+      return this._optional;
+    }
+
+    const response: Awaited<boolean> = await computeQuery(
+      [
+        ...this._queryTree,
+        {
+          operation: "optional",
+        },
+      ],
+      this.client
+    );
+
+    return response;
+  }
+
+  /**
+   * Adds a static field for an Object TypeDef, failing if the type is not an object.
+   * @param name The name of the field in the object
+   * @param typeDef The type of the field
+   * @param opts.description A doc string for the field, if any
+   */
+  withField(
+    name: string,
+    typeDef: TypeDef,
+    opts?: TypeDefWithFieldOpts
+  ): TypeDef {
+    return new TypeDef({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "withField",
+          args: { name, typeDef, ...opts },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Adds a function for an Object TypeDef, failing if the type is not an object.
+   */
+  withFunction(function_: Function_): TypeDef {
+    return new TypeDef({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "withFunction",
+          args: { function_ },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Sets the kind of the type.
+   */
+  withKind(kind: TypeDefKind): TypeDef {
+    return new TypeDef({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "withKind",
+          args: { kind },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Returns a TypeDef of kind List with the provided type for its elements.
+   */
+  withListOf(elementType: TypeDef): TypeDef {
+    return new TypeDef({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "withListOf",
+          args: { elementType },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Returns a TypeDef of kind Object with the provided name.
+   *
+   * Note that an object's fields and functions may be omitted if the intent is
+   * only to refer to an object. This is how functions are able to return their
+   * own object, or any other circular reference.
+   */
+  withObject(name: string, opts?: TypeDefWithObjectOpts): TypeDef {
+    return new TypeDef({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "withObject",
+          args: { name, ...opts },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Sets whether this type can be set to null.
+   */
+  withOptional(optional: boolean): TypeDef {
+    return new TypeDef({
+      queryTree: [
+        ...this._queryTree,
+        {
+          operation: "withOptional",
+          args: { optional },
+        },
+      ],
+      host: this.clientHost,
+      sessionToken: this.sessionToken,
+    });
+  }
+
+  /**
+   * Call the provided function with current TypeDef.
+   *
+   * This is useful for reusability and readability by not breaking the calling chain.
+   */
+  with(arg: (param: TypeDef) => TypeDef) {
     return arg(this);
   }
 }

@@ -10,17 +10,28 @@ import {
   ExecError,
 } from "../deps.ts";
 
-import { QueryTree } from "./client.ts";
+import { Metadata, QueryTree } from "./client.ts";
 
 /**
  * Format argument into GraphQL query format.
  */
 function buildArgs(args: any): string {
+  const metadata: Metadata = args.__metadata || {};
+
   // Remove unwanted quotes
-  const formatValue = (value: string) =>
-    JSON.stringify(value).replace(/\{"[a-zA-Z]+":|,"[a-zA-Z]+":/gi, (str) =>
-      str.replace(/"/g, "")
+  const formatValue = (key: string, value: string) => {
+    // Special treatment for enumeration, they must be inserted without quotes
+    if (metadata[key]?.is_enum) {
+      return JSON.stringify(value).replace(/['"]+/g, "");
+    }
+
+    return JSON.stringify(value).replace(
+      /\{"[a-zA-Z]+":|,"[a-zA-Z]+":/gi,
+      (str) => {
+        return str.replace(/"/g, "");
+      }
     );
+  };
 
   if (args === undefined || args === null) {
     return "";
@@ -28,8 +39,13 @@ function buildArgs(args: any): string {
 
   const formattedArgs = Object.entries(args).reduce(
     (acc: any, [key, value]) => {
+      // Ignore internal metadata key
+      if (key === "__metadata") {
+        return acc;
+      }
+
       if (value !== undefined && value !== null) {
-        acc.push(`${key}: ${formatValue(value as string)}`);
+        acc.push(`${key}: ${formatValue(key, value as string)}`);
       }
 
       return acc;
@@ -124,7 +140,14 @@ export function buildQuery(q: QueryTree[]): string {
     return acc;
   }, "");
 
-  return `{${query} }`;
+  return `{${query
+    .replaceAll('"StringKind"', "StringKind")
+    .replaceAll('"VoidKind"', "VoidKind")
+    .replaceAll('"IntegerKind"', "IntegerKind")
+    .replaceAll('"BooleanKind"', "BooleanKind")
+    .replaceAll('"ObjectKind"', "ObjectKind")
+    .replaceAll('"ListKind"', "ListKind")
+    .replaceAll("function_", "function")} }`;
 }
 
 /**
